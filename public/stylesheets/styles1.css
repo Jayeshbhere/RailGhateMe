@@ -1,9 +1,9 @@
 .card {
     width: 40vw;
     height: 15vw;
-    background: #F4F6FB;
-    border: 1px solid white;
-    box-shadow: 10px 10px 64px 0px rgba(209, 209, 228, 0.75);
+    background: #e0e8fc;
+    border: 1px solid rgb(175, 211, 239);
+    box-shadow: 10px 10px 64px 0px rgba(149, 149, 245, 0.9);
     margin:15vw auto;
   }
   
@@ -25,7 +25,7 @@
   
   .form_heading {
     padding-bottom: 20px;
-    font-size: 21px;
+    font-size: 27px;
     color: #7878bd;
   }
   
@@ -58,7 +58,7 @@
   }
   
   button {
-    background-color: #7878bd;
+    background-color: #8383e5;
     margin-top: 10px;
     font-size: 14px;
     padding: 7px 12px;
@@ -68,5 +68,5 @@
   }
   
   button:hover {
-    background-color: #5f5f9c;
+    background-color: #5151d7;
   }
