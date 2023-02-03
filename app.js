@@ -1,4 +1,7 @@
-require('dotenv').config();
+if(process.env.NODE_ENV !=='production'){
+    require('dotenv').config();
+}
+
 const express = require('express');
 const ejsMate = require('ejs-mate');
 const app = express();
@@ -18,6 +21,8 @@ const multer = require('multer');
 const { storage } = require('./cloudinary/index');
 const upload = multer({ storage });
 const { approveMail } = require('./gmail/approved');
+const catchAsync=require('./utils/catchAsync');
+const { appliedMail } = require('./gmail/applied');
 
 
 
@@ -68,6 +73,7 @@ passport.use(new passportLocal(Student.authenticate()));
 
 passport.serializeUser(Student.serializeUser());
 passport.deserializeUser(Student.deserializeUser());
+app.use(express.static('public'))
 
 app.use((req, res, next) => {
     // console.log(req.session);
@@ -86,7 +92,7 @@ app.get('/delete', async (req, res) => {
     await Request.deleteMany({});
     console.log('deleted');
 })
-app.get('/post', async (req, res) => {
+app.get('/post',catchAsync( async (req, res) => {
     const reqs = {
         address: "asdf asdfas fdsaf asdf",
         railway_line: "central",
@@ -99,9 +105,9 @@ app.get('/post', async (req, res) => {
     // const newReq=await Reuqest.find({}).populate('student');
     const newReq = new Request(reqs);
     await newReq.save();
-    console.log(newReq);
+    // console.log(newReq);
     res.send(newReq);
-})
+}))
 app.get('/showReq', async (req, res) => {
     const data = await Request.find({});
     res.send(data);
@@ -110,25 +116,25 @@ app.get('/showStudent', async (req, res) => {
     const data = await Request.find({});
     res.send(data);
 })
-app.get('/institute_view', async (req, res) => {
+app.get('/institute_view',catchAsync( async (req, res) => {
     // const StudentData=await Student.find({});
     const Requests = await Request.find({ "request_status": "false" }).populate(
         "student"
     );
     // console.log(StudentData);
     res.render('institute_view', { Requests });
-})
+}))
 
 
-app.get('/institute_view/aprroved', async (req, res) => {
+app.get('/institute_view/aprroved',catchAsync( async (req, res) => {
     const Requests = await Request.find({ request_status: true }).populate(
         "student"
     );
-    console.log(Requests);
+    // console.log(Requests);
     res.render('accepted', { Requests });
-})
+}))
 
-app.get('/institute_view/:id', async (req, res) => {
+app.get('/institute_view/:id',catchAsync( async (req, res) => {
     const id = req.params.id;
     const reqs = await Request.findById(id).populate('student');
     console.log(reqs);
@@ -136,28 +142,29 @@ app.get('/institute_view/:id', async (req, res) => {
 
     res.render('view', { reqs });
     
-})
-app.post('/deleteAP/:id', async (req, res) => {
+}))
+app.post('/deleteAP/:id',catchAsync( async (req, res) => {
     const id = req.params.id;
     await Request.findByIdAndDelete(id);
+    req.flash('success','request deleted');
     res.redirect('/institute_view');
-})
-app.get('/institute_view/approved/:id', async (req, res) => {
+}))
+app.get('/institute_view/approved/:id',catchAsync( async (req, res) => {
     const id = req.params.id;
     const reqs = await Request.findById(id).populate('student');
     // console.log(reqs);
     res.render('viewA', { reqs });
-})
+}))
 
-app.get('/institute_view/reverted/:id', async (req, res) => {
+app.get('/institute_view/reverted/:id',catchAsync( async (req, res) => {
     const req_id = req.params.id
     console.log(req_id);
     const request = await Request.findById(req_id).populate('student');
-    console.log(request);
+    // console.log(request);
     res.render('rejected', { request });
 
-})
-app.post('/institue_view/reverted/:id', async (req, res) => {
+}))
+app.post('/institue_view/reverted/:id',catchAsync( async (req, res) => {
     const req_id = req.params.id
     const request = await Request.findById(req_id).populate('student');
     const id = request.student._id;
@@ -168,16 +175,17 @@ app.post('/institue_view/reverted/:id', async (req, res) => {
         to: student.email,
         subject: "Request Reverted",
         
-        html: `<p>Dear ${student.first_name} ${student.last_name}, your application for the concession has been reverted back due to the provided <strong> ${req.body.reason} ${req.body.reason1} </strong>.</p> <p> You may now check the status of the application and make the required changes and re-apply for the application. </p>`
+        html: `<p>Dear ${student.first_name} ${student.last_name}, your application for the concession has been reverted back due to the provided reason, <strong> ${req.body.reason} ${req.body.reason1} </strong>.</p> <p> You may now check the status of the application and make the required changes and re-apply for the application. </p>`
     };
 
     sendMail(mailOptions);
+    req.flash('error','Request has been Reverted');
     res.redirect('/institute_view');
 
 
 
-})
-app.post('/institute_view/accepted/:id', async (req, res) => {
+}))
+app.post('/institute_view/accepted/:id',catchAsync( async (req, res) => {
     const req_id = req.params.id
     const request = await Request.findById(req_id).populate('student');
     request.request_status = true;
@@ -193,21 +201,22 @@ app.post('/institute_view/accepted/:id', async (req, res) => {
         html: `<p> Dear ${student.first_name} ${student.last_name}, your request for the railway concession has been approved.</p>  <p>You may now visit the Railway Concession Office and get your approved concession, duly stamped and signed. </p>`
     };
     approveMail(mailOptions);
+    req.flash('success','Request has been Approved');
     res.redirect('/institute_view');
 
 
-})
+}))
 
-app.post('/application', passport.authenticate('local', { failureFlash: true, failureRedirect: '/' }), async (req, res) => {
+app.post('/application', passport.authenticate('local', { failureFlash: true, failureRedirect: '/' }),catchAsync( async (req, res) => {
 
 
    
     const s = await Student.findOne({ username: req.session.passport.user });
    
     res.render('application', { id: s._id });
-});
+}));
 
-app.post('/application/basicdetails', isLoggedIn, async (req, res) => {
+app.post('/application/basicdetails', isLoggedIn,catchAsync( async (req, res) => {
     
     const user = await Student.findOne({ username: req.session.passport.user });
    
@@ -224,13 +233,13 @@ app.post('/application/basicdetails', isLoggedIn, async (req, res) => {
 
 
 
-})
-app.get('/application/uploaddoc/:id', isLoggedIn, async (req, res) => {
+}))
+app.get('/application/uploaddoc/:id', isLoggedIn,catchAsync( async (req, res) => {
 
     const st = await Student.findById(req.params.id);
    
     res.render('documents', { st });
-})
+}))
 app.post('/application/uploaddoc/:id', isLoggedIn, upload.array('image', 3), async (req, res) => {
     
     images = req.files.map(f => ({ url: f.path, filename: f.filename }));
@@ -261,26 +270,33 @@ app.post('/application/conssesion/:id', isLoggedIn, async (req, res) => {
         returnOriginal:false
     });
 
+    const mailOptions = {
+        from: "vjtirailwayconcession@gmail.com",
+        to: student.email,
+        subject: "Application Submitted",
+        // text: "Testing mail sending using NodeJS"
+        html: `<p> Dear ${student.first_name} ${student.last_name}, You have successfully applied for the Railway Concession.</p> <p> You can always view you status of the application at Website. </p>`
+    };
 
-    // console.log(request);
-    // console.log(student);
-    // res.send('done');
-    // res.redirect('/application');
-    // res.render('status',{});
-    // res.send(request);
+    appliedMail(mailOptions);
 
-    res.redirect(`/status/${request._id}`);
+    res.redirect(`/status/${student._id}`);
 
 
 })
 app.get('/status/:id', isLoggedIn, async (req, res) => {
     // const re = await Request.findById(req.params.id);
     const id=req.params.id;
-    const student=await Student.findById(id).populate('requests');
+    // console.log(id);
+    const student=await Student.findById(id).populate({
+        path:'requests'
+    });
+    // console.log('in status');
     // console.log(student);
     res.render('status', { student });
 })
 app.get('/logout', isLoggedIn, async (req, res) => {
+
     req.logout(function (err) {
         if (err) {
             // req.flash('error', 'something went wrong');
@@ -289,7 +305,7 @@ app.get('/logout', isLoggedIn, async (req, res) => {
         }
 
 
-        // req.flash('success', 'Goodbye!!');
+        req.flash('success', 'You have successfully logged out');
         res.redirect('/');
     });
 
@@ -305,7 +321,8 @@ app.get('/institute_login', async (req, res) => {
 
 
 app.post('/signup', async (req, res) => {
-    console.log(req.body);
+    try{
+    // console.log(req.body);
     // const student=await Student(req.body);
     // await student.save();
     // res.send(req.body);
@@ -324,8 +341,12 @@ app.post('/signup', async (req, res) => {
             html: `<p>Dear User, you have successfully registered on our portal.</p> <p> Your USERNAME is <strong>${registeredStudent.username}</strong> and your registered email id is <strong>${registeredStudent.email}</strong>.</p> <p> You can now login, to apply for your concession at <strong>Login </strong>. </p>`
         };
         sendMail(mailOptions);
-        res.send(registeredStudent);
-    })
+        // res.send(registeredStudent);
+        res.redirect('/');
+    })}catch{
+        req.flash('error', 'User already exists');
+        res.redirect('/signup');
+    }
 })
 app.get('/view', (req, res) => {
     res.render('view');
@@ -341,8 +362,9 @@ app.post('/institute_login', (req, res) => {
 
 
 
-app.listen(3000, () => {
-    console.log('server connected');
+const port=process.env.PORT|| 3000;
+app.listen(port,()=>{
+    console.log(`Serving on port${port}`);
 })
 
 
